@@ -5,9 +5,13 @@ from models.simple_MLP import SimpleMLP
 from train.train import train
 from pathlib import Path
 import numpy as np
-# from lightning.fabric import seed_everything
+from lightning.fabric import seed_everything
 
 def main():
+    # set a manual, constant seed of 42 for most random number generators (numpy, torch, etc.)
+    seed=42
+    seed_everything(seed, workers=True)
+    
     # Verify the installation and check the version
     print(torch.__version__)
 
@@ -29,7 +33,7 @@ def main():
         y_test = torch.tensor(data['y_test'], dtype=torch.float32)
         print(f"Days: train={len(X_train)}, validation={len(X_val)}, test={len(X_test)}")
 
-    torch.manual_seed(0)
+    # torch.manual_seed(0)
     input_size = X_train.shape[1] * X_train.shape[2]
     model = SimpleMLP(input_size, 2)
     train(epochs=100, model=model, xdata=X_train, ydata=y_train,
