@@ -11,6 +11,8 @@ class SimpleMLP(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, X):
-        out = self.linear(X)
-        return self.activation(out)
+        out = self.linear(X.flatten(start_dim=1))
+        return out
+        #out = self.linear(X)
+        #return self.activation(out)
 

@@ -16,6 +16,7 @@ def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwr
     bool: whether data processing was successful (True) or unsuccessful (False)
     StandardScaler: scaler used for normalizing features'''
     
+    path_to_processed = path_to_processed.with_suffix('.npz')
     if path_to_processed.is_file() and not overwrite:
         print(f'Processed Data at specified path {path_to_processed} already exists. Either specify overwrite=true, or choose a different output path\n')
         return False, None
@@ -29,14 +30,17 @@ def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwr
         'Date Time',
         'p (mbar)',
         'T (degC)',
+        'rh (%)',
         'wv (m/s)',
         'wd (deg)',
         'rho (g/m**3)'
     ]
 
-    features_of_interest = data_raw[FEATURES]
+    features_of_interest = data_raw[FEATURES].copy()
+    features_of_interest['wv (m/s)'] = features_of_interest['wv (m/s)'].replace(-9999, np.nan)
     datetime_formatted = pd.to_datetime(features_of_interest['Date Time'], format='%d.%m.%Y %H:%M:%S')
     features_of_interest['Date Time'] = datetime_formatted
+    features_of_interest = features_of_interest.drop_duplicates('Date Time', keep='last')
     features_datetime_indexed = features_of_interest.sort_values('Date Time').set_index('Date Time') # sort by datetime to make sure, then set datetimes as index label
     new_idx_labels = pd.date_range(start=features_datetime_indexed.index.min().floor('D'), 
                   end=features_datetime_indexed.index.max().ceil('D') - pd.Timedelta(minutes=10),
@@ -52,11 +56,14 @@ def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwr
     # creating labels to train against (min temp & max temp of next day)
     temp_col = 1
     temps = grouped_data[:, :, temp_col] # shape = num_days, 144
-    day_maxes = np.nanmax(temps, axis=1) # shape = num_days,
-    day_mins = np.nanmin(temps, axis=1) # shape = num_days,
-    y_ = np.hstack([day_mins[1:], day_maxes[1:]]) # shape = num_days - 1, 2
+    day_maxes = np.max(temps, axis=1) # shape = num_days,
+    day_mins = np.min(temps, axis=1) # shape = num_days,
+    y_ = np.column_stack([day_mins[1:], day_maxes[1:]]) # shape = num_days - 1, 2
     X_ = grouped_data[:-1, :, :] # shape = num_days - 1, 144, num_features
     # since our prediction problem is predicting next-day temps, we need to drop the last day from our feature dataset, and drop the first day's temps from our label dataset
+    # Require a complete target day's temperatures to calculate its true daily extremes.
+    valid_targets = np.isfinite(temps[1:]).all(axis=1)
+    X_, y_ = X_[valid_targets], y_[valid_targets]
 
 
     # split into train, validation, and test data (80% train, 10% validation, 10% test)
@@ -72,9 +79,9 @@ def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwr
 
     X_tr_scaling, X_val_scaling, X_test_scaling = einops.rearrange(X_tr, 'd e f -> (d e) f'), einops.rearrange(X_val, 'd e f -> (d e) f'), einops.rearrange(X_test, 'd e f -> (d e) f')
    
-    X_tr_scaled = einops.rearrange(scaler.fit_transform(X_tr_scaling), '(d e) f -> d e f') # compute and store scaled X_tr
-    X_val_scaled = einops.rearrange(scaler.fit_transform(X_val_scaling), '(d e) f -> d e f') # compute and store scaled X_val
-    X_test_scaled = einops.rearrange(scaler.fit_transform(X_test_scaling), '(d e) f -> d e f') # compute and store scaled X_test
+    X_tr_scaled = einops.rearrange(scaler.fit_transform(X_tr_scaling), '(d e) f -> d e f', e=num_examples_per_day) # compute and store scaled X_tr
+    X_val_scaled = einops.rearrange(scaler.transform(X_val_scaling), '(d e) f -> d e f', e=num_examples_per_day) # compute and store scaled X_val
+    X_test_scaled = einops.rearrange(scaler.transform(X_test_scaling), '(d e) f -> d e f', e=num_examples_per_day) # compute and store scaled X_test
 
     # create a mask for NaNs and then replace them so that the replaced values don't affect our models/predictions (as much)
     def fill_nans_and_stack_mask(X: np.ndarray) -> np.ndarray:
@@ -97,7 +104,3 @@ def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwr
          y_test=y_test)
     
     return True, scaler
-
-
-    
-    

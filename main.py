@@ -1,6 +1,10 @@
 import torch
 from data import process_data
 from pathlib import Path
+from models.simple_MLP import SimpleMLP
+from train.train import train
+from pathlib import Path
+import numpy as np
 # from lightning.fabric import seed_everything
 
 def main():
@@ -10,11 +14,41 @@ def main():
     # Check if CUDA (GPU support) is available
     print(torch.cuda.is_available())
     
-
-    path_raw = Path("./jena_climate_2009_2016.csv")
-    path_processed = Path("jena_climate_data_processed.csv")
+    root = Path(__file__).resolve().parent
+    path_raw = root / "data" / "jena_climate_2009_2016.csv"
+    path_processed = root / "data" / "jena_climate_data_processed.npz"
 
     process_data.create_processed_data_csv(path_raw, path_processed, True)
+
+    with np.load(path_processed) as data:
+        X_train = torch.tensor(data['X_train'], dtype=torch.float32)
+        y_train = torch.tensor(data['y_train'], dtype=torch.float32)
+        X_val = torch.tensor(data['X_validate'], dtype=torch.float32)
+        y_val = torch.tensor(data['y_val'], dtype=torch.float32)
+        X_test = torch.tensor(data['X_test'], dtype=torch.float32)
+        y_test = torch.tensor(data['y_test'], dtype=torch.float32)
+        print(f"Days: train={len(X_train)}, validation={len(X_val)}, test={len(X_test)}")
+
+    torch.manual_seed(0)
+    input_size = X_train.shape[1] * X_train.shape[2]
+    model = SimpleMLP(input_size, 2)
+    train(epochs=100, model=model, xdata=X_train, ydata=y_train,
+          scaler=None, loss_func=1, opt_method=2, lr=0.001, diagnostics=False)
+
+    model.eval()
+    with torch.no_grad():
+        val_mse = torch.nn.functional.mse_loss(model(X_val), y_val).item()
+        predictions = model(X_test)
+        test_mse = torch.nn.functional.mse_loss(predictions, y_test).item()
+        test_mae = (predictions - y_test).abs().mean(dim=0)
+    print(f"Validation MSE: {val_mse:.4f} degC^2")
+    print(f"Test MSE: {test_mse:.4f} degC^2")
+    print(f"Test MAE: minimum={test_mae[0].item():.4f} degC, maximum={test_mae[1].item():.4f} degC")
+    print("First 5 test predictions [min, max] in degC:")
+    for i in range(min(5, len(y_test))):
+        pred_min, pred_max = predictions[i].tolist()
+        actual_min, actual_max = y_test[i].tolist()
+        print(f"  {i + 1}: predicted [{pred_min:.2f}, {pred_max:.2f}]; actual [{actual_min:.2f}, {actual_max:.2f}]")
 
 if __name__ == "__main__":
     main()
