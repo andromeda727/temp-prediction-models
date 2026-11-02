@@ -11,7 +11,7 @@ def main():
     # set a manual, constant seed of 42 for most random number generators (numpy, torch, etc.)
     seed=42
     seed_everything(seed, workers=True)
-    
+
     # Verify the installation and check the version
     print(torch.__version__)
 
@@ -22,8 +22,9 @@ def main():
     path_raw = root / "data" / "jena_climate_2009_2016.csv"
     path_processed = root / "data" / "jena_climate_data_processed.npz"
 
-    process_data.create_processed_data_csv(path_raw, path_processed, True)
+    process_data.create_processed_data(path_raw, path_processed, True)
 
+    # load processed data from file (npz)
     with np.load(path_processed) as data:
         X_train = torch.tensor(data['X_train'], dtype=torch.float32)
         y_train = torch.tensor(data['y_train'], dtype=torch.float32)
@@ -39,6 +40,7 @@ def main():
     train(epochs=100, model=model, xdata=X_train, ydata=y_train,
           scaler=None, loss_func=1, opt_method=2, lr=0.001, diagnostics=False)
 
+    # calculate validation and test MSE and report findings
     model.eval()
     with torch.no_grad():
         val_mse = torch.nn.functional.mse_loss(model(X_val), y_val).item()

@@ -3,7 +3,7 @@ import torch.nn as nn
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 
-def train(epochs:int, model:nn.Module, xdata:torch.Tensor, ydata:torch.Tensor, scaler:StandardScaler, loss_func:int = 1, opt_method:int = 1, lr:float = 0.01, diagnostics: bool = True) -> tuple[list, list]:
+def train(epochs:int, model:nn.Module, xdata:torch.Tensor, ydata:torch.Tensor, scaler:StandardScaler | None, loss_func:int = 1, opt_method:int = 1, lr:float = 0.01, diagnostics: bool = True) -> tuple[list, list]:
     '''Train the given model using the given data
     Params:
         epochs: # of epochs to train for

@@ -6,7 +6,7 @@ import einops
 import numpy as np
 
 
-def create_processed_data_csv(path_to_raw: Path, path_to_processed: Path, overwrite: bool = False) -> tuple[bool, StandardScaler | None]:
+def create_processed_data(path_to_raw: Path, path_to_processed: Path, overwrite: bool = False) -> tuple[bool, StandardScaler | None]:
     '''function for processing raw Jena climate data csv into usable data for our ML problem
     Parameters:
     path_to_raw: pathlib.Path -- path to raw csv file containing Jena climate data (sourced from Kaggle: https://www.kaggle.com/datasets/mnassrib/jena-climate)
