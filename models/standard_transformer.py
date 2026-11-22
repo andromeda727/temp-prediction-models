@@ -16,6 +16,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe.unsqueeze(0))
 
     def forward(self, x):
+        assert isinstance(self.pe, torch.Tensor)
         return x + self.pe[:, :x.size(1)]
 
 class STF(nn.Module):
