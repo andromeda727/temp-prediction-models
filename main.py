@@ -1,7 +1,7 @@
 import torch
 from data import process_data
 from pathlib import Path
-from models.simple_MLP import SimpleMLP
+from models.standard_MLP import StandardMLP
 from train.train import train
 from pathlib import Path
 import numpy as np
